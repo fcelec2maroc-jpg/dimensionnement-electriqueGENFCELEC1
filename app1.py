@@ -6,57 +6,41 @@ from fpdf import FPDF
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="FC ELEC - Bureau d'Études", layout="wide", initial_sidebar_state="expanded")
 
-# --- INJECTION DE STYLE CSS (Design Pro) ---
+# --- INJECTION DE STYLE CSS ---
 st.markdown("""
     <style>
     .reportview-container { background: #f4f6f9; }
     .stButton>button { width: 100%; border-radius: 5px; font-weight: bold; }
-    .metric-card { background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     </style>
 """, unsafe_allow_html=True)
 
-# --- CLASSE PDF "DOSSIER TECHNIQUE" ---
+# --- CLASSE PDF "UNE SEULE PAGE" ---
 class FCELEC_Report(FPDF):
-    def cover_page(self, nom_projet, titre_doc):
-        self.add_page()
-        try: self.image("logoFCELEC.png", 60, 40, 90)
-        except: pass
-        self.ln(80)
-        self.set_font("Helvetica", "B", 24)
-        self.cell(0, 15, "DOSSIER TECHNIQUE ÉLECTRIQUE", ln=True, align="C")
-        self.set_font("Helvetica", "B", 18)
-        self.set_text_color(100, 100, 100)
-        self.cell(0, 15, titre_doc.upper(), ln=True, align="C")
-        self.ln(20)
-        self.set_text_color(0, 0, 0)
-        self.set_font("Helvetica", "", 14)
-        self.cell(0, 10, f"PROJET / CLIENT : {nom_projet.upper()}", ln=True, align="C")
-        self.cell(0, 10, f"Date de l'étude : {datetime.date.today().strftime('%d/%m/%Y')}", ln=True, align="C")
-        self.ln(40)
-        self.set_font("Helvetica", "I", 11)
-        self.cell(0, 10, "Document certifié conforme aux prescriptions de la norme NF C 15-100", ln=True, align="C")
-        
     def header(self):
-        if self.page_no() > 1:
-            try: self.image("logoFCELEC.png", 10, 8, 25)
-            except: pass
-            self.set_font("Helvetica", "B", 12)
-            self.cell(80)
-            self.cell(30, 10, "NOTE DE CALCUL", 0, 0, "C")
-            self.set_font("Helvetica", "I", 8)
-            self.cell(0, 10, f"Date: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1, "R")
-            self.line(10, 22, 200, 22)
-            self.ln(10)
+        # Logo en haut à gauche
+        try: self.image("logoFCELEC.png", 10, 8, 25)
+        except: pass
+        # Titre central
+        self.set_font("Helvetica", "B", 16)
+        self.cell(30) # Décalage pour le logo
+        self.cell(120, 8, "DOSSIER TECHNIQUE ÉLECTRIQUE", border=0, ln=0, align="C")
+        # Date en haut à droite
+        self.set_font("Helvetica", "I", 9)
+        self.cell(40, 8, f"Date : {datetime.date.today().strftime('%d/%m/%Y')}", border=0, ln=1, align="R")
+        # Sous-titre
+        self.set_font("Helvetica", "I", 10)
+        self.cell(30)
+        self.cell(120, 6, "Note de calcul conforme à la norme NF C 15-100", border=0, ln=1, align="C")
+        # Ligne de séparation
+        self.line(10, 26, 200, 26)
+        self.ln(10)
 
     def footer(self):
-        self.set_y(-20)
+        self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(128, 128, 128)
-        self.line(10, 277, 200, 277)
-        self.cell(0, 6, "FC ELEC - Bureau d'Études Électriques", 0, 1, "C")
-        self.cell(0, 6, "Assistance & Contact WhatsApp : +212 6 74 53 42 64", 0, 1, "C")
-        self.set_font("Helvetica", "", 8)
-        self.cell(0, 4, f"Page {self.page_no()}", 0, 0, "R")
+        self.line(10, 282, 200, 282)
+        self.cell(0, 5, "FC ELEC - Bureau d'Études Électriques | Assistance WhatsApp : +212 6 74 53 42 64", 0, 0, "C")
 
 # --- SYSTÈME DE SÉCURITÉ ---
 def check_password():
@@ -119,7 +103,7 @@ if check_password():
         V = 230 if "Monophasé" in tension_type else 400
         rho = 0.0225 if "Cuivre" in nature_cable else 0.036
         b = 2 if "Monophasé" in tension_type else 1
-        cos_phi = 0.85 # Standardisé pour la simplification
+        cos_phi = 0.85 
 
         if mode_saisie == "Puissance (W)":
             Ib = valeur_saisie / (V * cos_phi) if b == 2 else valeur_saisie / (V * math.sqrt(3) * cos_phi)
@@ -136,43 +120,50 @@ if check_password():
         du_reel_v = (b * rho * longueur * Ib) / (S_retenue if isinstance(S_retenue, float) else 300)
         du_reel_pct = (du_reel_v / V) * 100
 
-        # Affichage style "Dashboard"
         st.markdown("### 📊 Synthèse des Résultats")
         res1, res2, res3, res4 = st.columns(4)
         res1.metric("Courant d'emploi (Ib)", f"{Ib:.2f} A")
-        res2.metric("Calibre Disjoncteur (In)", f"{In} A", help="Protection magnéto-thermique recommandée")
+        res2.metric("Calibre Disjoncteur (In)", f"{In} A")
         res3.metric("Section Normalisée", f"{S_retenue} mm²")
         res4.metric("Chute de tension", f"{du_reel_pct:.2f} %", delta=f"Max autorisé: {du_max_pct}%", delta_color="inverse" if du_reel_pct > du_max_pct else "normal")
 
-        # Génération du PDF Bureau d'études
+        # PDF UNE SEULE PAGE (Liaison)
         def generate_pdf_liaison():
             pdf = FCELEC_Report()
-            pdf.cover_page(nom_projet, "Dimensionnement de Liaison")
             pdf.add_page()
-            pdf.set_font("Helvetica", "B", 14)
-            pdf.cell(190, 10, "1. HÉPOTHÈSES DE CALCUL", border='B', ln=True)
-            pdf.ln(5)
-            pdf.set_font("Helvetica", "", 11)
-            pdf.cell(95, 8, f"Circuit : {ref_circuit}", ln=0); pdf.cell(95, 8, f"Réseau : {tension_type}", ln=1)
-            pdf.cell(95, 8, f"Longueur : {longueur} mètres", ln=0); pdf.cell(95, 8, f"Nature : {nature_cable}", ln=1)
-            pdf.cell(95, 8, f"Puissance / Courant : {valeur_saisie} {'W' if 'Puissance' in mode_saisie else 'A'}", ln=0)
-            pdf.cell(95, 8, f"Chute de tension limite : {du_max_pct} %", ln=1)
-            pdf.ln(10)
-            pdf.set_font("Helvetica", "B", 14)
-            pdf.cell(190, 10, "2. RÉSULTATS NORMATIFS", border='B', ln=True)
-            pdf.ln(5)
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(95, 10, "Courant d'emploi (Ib) :", border=1); pdf.cell(95, 10, f"{Ib:.2f} A", border=1, ln=1, align="C")
-            pdf.cell(95, 10, "Calibre Protection (In) :", border=1); pdf.cell(95, 10, f"{In} A", border=1, ln=1, align="C")
-            pdf.set_fill_color(240, 240, 240)
-            pdf.cell(95, 12, "SECTION CÂBLE RETENUE :", border=1, fill=True)
-            pdf.set_text_color(255, 100, 0)
-            pdf.cell(95, 12, f"{S_retenue} mm2", border=1, ln=1, align="C", fill=True)
-            pdf.set_text_color(0,0,0)
-            pdf.cell(95, 10, "Chute de tension réelle :", border=1); pdf.cell(95, 10, f"{du_reel_pct:.2f} % (Conforme)", border=1, ln=1, align="C")
             
-            # Bloc de signature
-            pdf.ln(30)
+            # Titre du Projet
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_fill_color(230, 230, 230)
+            pdf.cell(190, 10, f" PROJET : {nom_projet.upper()}  |  CIRCUIT : {ref_circuit.upper()}", border=1, ln=True, align="C", fill=True)
+            pdf.ln(8)
+            
+            # Hypothèses
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(190, 8, "1. PARAMÈTRES ET HYPOTHÈSES DE CALCUL", ln=True)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(95, 8, f"  - Réseau : {tension_type}", border=1)
+            pdf.cell(95, 8, f"  - Conducteur : {nature_cable}", border=1, ln=True)
+            pdf.cell(95, 8, f"  - Longueur : {longueur} m", border=1)
+            pdf.cell(95, 8, f"  - Charge : {valeur_saisie} {'W' if 'Puissance' in mode_saisie else 'A'}", border=1, ln=True)
+            pdf.ln(8)
+            
+            # Résultats
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(190, 8, "2. RÉSULTATS NORMATIFS", ln=True)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(95, 8, f"  - Courant d'emploi (Ib) : {Ib:.2f} A", border=1)
+            pdf.cell(95, 8, f"  - Chute de tension réelle : {du_reel_pct:.2f} %", border=1, ln=True)
+            
+            # Mise en valeur des résultats finaux
+            pdf.ln(5)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_fill_color(255, 245, 230) # Fond légèrement orangé
+            pdf.cell(95, 12, f"  CALIBRE PROTECTION (In) : {In} A", border=1, fill=True)
+            pdf.cell(95, 12, f"  SECTION RETENUE : {S_retenue} mm2", border=1, ln=True, fill=True)
+            
+            # Bloc Signature
+            pdf.ln(25)
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(120, 10, "")
             pdf.cell(70, 10, "Le Bureau d'Études / L'Ingénieur :", ln=True, align="C")
@@ -181,8 +172,8 @@ if check_password():
             
             return pdf.output()
 
-        if st.button("📄 Éditer le Dossier Technique (PDF)", type="primary"):
-            st.download_button("📥 Confirmer le téléchargement", bytes(generate_pdf_liaison()), f"Dossier_{ref_circuit}.pdf")
+        if st.button("📄 Éditer le Rapport PDF", type="primary"):
+            st.download_button("📥 Télécharger le Rapport", bytes(generate_pdf_liaison()), f"Rapport_{ref_circuit}.pdf")
 
     # ---------------------------------------------------------
     # MODULE 2 : BILAN DE PUISSANCE TGBT
@@ -203,8 +194,6 @@ if check_password():
                 p_inst = c2.number_input("P. Installée (W)", min_value=0, value=1000)
                 type_c = c3.selectbox("Famille de charge", ["Éclairage", "Prises", "Moteur / CVC", "Chauffage", "Divers"])
                 
-                # Explication Ku
-                st.caption("Le Facteur d'Utilisation (Ku) détermine le taux de charge réel de l'équipement.")
                 ku_def = 1.0 if type_c in ["Éclairage", "Chauffage"] else 0.75 if type_c == "Moteur / CVC" else 0.5 if type_c == "Prises" else 0.8
                 ku = st.slider("Facteur d'utilisation (Ku)", 0.1, 1.0, ku_def)
                 
@@ -220,7 +209,7 @@ if check_password():
             p_total_abs = sum(x['P.Abs (W)'] for x in st.session_state.bilan_pro)
             
             st.markdown("#### 📉 Application du Foisonnement Global")
-            ks = st.slider("Facteur de Simultanéité (Ks) du tableau", 0.4, 1.0, 0.8, help="Dépend du nombre de circuits et du type de bâtiment.")
+            ks = st.slider("Facteur de Simultanéité (Ks) du tableau", 0.4, 1.0, 0.8)
             p_souscription = p_total_abs * ks
             
             col_res1, col_res2, col_res3 = st.columns(3)
@@ -228,28 +217,44 @@ if check_password():
             col_res2.metric("Total Absorbé (Ku)", f"{p_total_abs} W")
             col_res3.metric("PUISSANCE D'APPEL (Ks)", f"{int(p_souscription)} W")
 
-            if st.button("📄 Éditer la Note de Bilan (PDF)", type="primary"):
+            # PDF UNE SEULE PAGE (Bilan)
+            def generate_pdf_bilan():
                 pdf = FCELEC_Report()
-                pdf.cover_page(nom_projet, f"Bilan de Puissance - {nom_tgbt}")
                 pdf.add_page()
-                pdf.set_font("Helvetica", "B", 14)
-                pdf.cell(190, 10, f"TABLEAU RÉCAPITULATIF : {nom_tgbt}", ln=True, align="C")
-                pdf.ln(5)
-                # En-têtes
-                pdf.set_font("Helvetica", "B", 10); pdf.set_fill_color(200, 200, 200)
-                pdf.cell(60, 10, "Circuit", 1, 0, 'C', True); pdf.cell(40, 10, "Type", 1, 0, 'C', True)
-                pdf.cell(30, 10, "P.Inst", 1, 0, 'C', True); pdf.cell(20, 10, "Ku", 1, 0, 'C', True)
-                pdf.cell(40, 10, "P.Absorbée", 1, 1, 'C', True)
-                pdf.set_font("Helvetica", "", 10)
+                
+                # Titre du Projet
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_fill_color(230, 230, 230)
+                pdf.cell(190, 10, f" PROJET : {nom_projet.upper()}  |  TABLEAU : {nom_tgbt.upper()}", border=1, ln=True, align="C", fill=True)
+                pdf.ln(8)
+                
+                # Tableau des circuits
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_fill_color(200, 200, 200)
+                pdf.cell(60, 8, "Circuit", 1, 0, 'C', True)
+                pdf.cell(40, 8, "Type", 1, 0, 'C', True)
+                pdf.cell(30, 8, "P.Inst (W)", 1, 0, 'C', True)
+                pdf.cell(20, 8, "Ku", 1, 0, 'C', True)
+                pdf.cell(40, 8, "P.Absorbée", 1, 1, 'C', True)
+                
+                pdf.set_font("Helvetica", "", 9)
                 for c in st.session_state.bilan_pro:
-                    pdf.cell(60, 8, c['Désignation'], 1); pdf.cell(40, 8, c['Famille'], 1)
-                    pdf.cell(30, 8, f"{c['P.Inst (W)']} W", 1, 0, 'C'); pdf.cell(20, 8, str(c['Ku']), 1, 0, 'C')
+                    pdf.cell(60, 8, c['Désignation'], 1)
+                    pdf.cell(40, 8, c['Famille'], 1)
+                    pdf.cell(30, 8, str(c['P.Inst (W)']), 1, 0, 'C')
+                    pdf.cell(20, 8, str(c['Ku']), 1, 0, 'C')
                     pdf.cell(40, 8, f"{c['P.Abs (W)']} W", 1, 1, 'C')
                 
-                pdf.ln(10)
+                # Résultat final
+                pdf.ln(8)
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 12, f"PUISSANCE MAXIMALE D'APPEL DU TABLEAU (Ks={ks}) : {int(p_souscription)} W", border=1, ln=True, align="C", fill=True)
-                st.download_button("📥 Télécharger le Bilan", bytes(pdf.output()), f"Bilan_{nom_tgbt}.pdf")
+                pdf.set_fill_color(255, 245, 230)
+                pdf.cell(190, 12, f"PUISSANCE MAXIMALE D'APPEL (Ks={ks}) : {int(p_souscription)} Watts", border=1, ln=True, align="C", fill=True)
+                
+                return pdf.output()
+
+            if st.button("📄 Éditer la Note de Bilan (PDF)", type="primary"):
+                st.download_button("📥 Télécharger le Bilan", bytes(generate_pdf_bilan()), f"Bilan_{nom_tgbt}.pdf")
 
             if st.button("🗑️ Réinitialiser le Bilan"):
                 st.session_state.bilan_pro = []; st.rerun()
@@ -264,14 +269,13 @@ if check_password():
         with st.container(border=True):
             p_kw = st.number_input("Puissance Active de l'installation (kW)", min_value=1.0, value=100.0)
             col1, col2 = st.columns(2)
-            cos_ini = col1.number_input("Cos φ initial (Facteur de puissance actuel)", min_value=0.3, max_value=0.99, value=0.75, step=0.01)
-            cos_vise = col2.number_input("Cos φ cible (Généralement 0.93 ou 0.95)", min_value=0.8, max_value=1.0, value=0.95, step=0.01)
+            cos_ini = col1.number_input("Cos φ initial (actuel)", min_value=0.3, max_value=0.99, value=0.75, step=0.01)
+            cos_vise = col2.number_input("Cos φ cible (désiré)", min_value=0.8, max_value=1.0, value=0.95, step=0.01)
             
             tan_ini = math.tan(math.acos(cos_ini))
             tan_vise = math.tan(math.acos(cos_vise))
             Qc = p_kw * (tan_ini - tan_vise)
             
-            st.info(f"Formule appliquée : Qc = P × (tan φ1 - tan φ2) = {p_kw} × ({tan_ini:.2f} - {tan_vise:.2f})")
             st.success(f"Puissance Réactive de la Batterie de Condensateurs : **{math.ceil(Qc)} kVAR**")
 
     # ---------------------------------------------------------
@@ -294,7 +298,7 @@ if check_password():
             calibre = 20 if "11" in p_borne else 40
             
         st.write(f"- **Disjoncteur Magnéto-Thermique** : {calibre}A Courbe C")
-        st.warning("- **Protection Différentielle** : Obligatoirement un interrupteur différentiel **30mA Type B** (ou Type A avec détection courant de fuite DC intégrée à la borne).")
+        st.warning("- **Protection Différentielle** : Obligatoirement un interrupteur différentiel **30mA Type B**.")
 
     # --- DÉCONNEXION ---
     st.sidebar.markdown("---")
